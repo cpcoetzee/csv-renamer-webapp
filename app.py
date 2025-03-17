@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Mar 17 17:31:19 2025
-
-@author: mac
-"""
-
 import os
 import pandas as pd
 import re
@@ -74,25 +66,28 @@ def format_date(date_str):
 # Function to rename CSV file
 def rename_csv_file(uploaded_file):
     try:
+        # Reset file pointer
+        uploaded_file.seek(0)
+        
+        # Read the CSV file into DataFrame
         df = pd.read_csv(uploaded_file, nrows=15, header=None, encoding='utf-8', encoding_errors='ignore')
 
         from_date = None
         to_date = None
         test_set = None
-        
-        for col in range(min(10, len(df.columns))):
-            if col < len(df.columns) and isinstance(df.iloc[0, col], str) and "date from" in df.iloc[0, col].lower():
-                if col + 1 < len(df.columns) and pd.notna(df.iloc[0, col+1]):
-                    from_date = df.iloc[0, col+1]
-                break
-        
-        for col in range(min(10, len(df.columns))):
-            if col < len(df.columns) and isinstance(df.iloc[1, col], str) and "date to" in df.iloc[1, col].lower():
-                if col + 1 < len(df.columns) and pd.notna(df.iloc[1, col+1]):
-                    to_date = df.iloc[1, col+1]
-                break
 
-        for row in range(min(15, len(df))):
+        # Scan first 5 rows for 'Date From' and 'Date To'
+        for row in range(min(5, len(df))):
+            for col in range(min(10, len(df.columns))):
+                cell_value = df.iloc[row, col]
+                if isinstance(cell_value, str):
+                    if "date from" in cell_value.lower():
+                        from_date = df.iloc[row, col + 1] if col + 1 < len(df.columns) else None
+                    if "date to" in cell_value.lower():
+                        to_date = df.iloc[row, col + 1] if col + 1 < len(df.columns) else None
+
+        # Extract test set from first 10 rows
+        for row in range(min(10, len(df))):
             for col in range(min(5, len(df.columns))):
                 cell_value = df.iloc[row, col]
                 if pd.notna(cell_value):
@@ -103,18 +98,19 @@ def rename_csv_file(uploaded_file):
             if test_set:
                 break
 
+        # Format the extracted values
         from_date_str = format_date(from_date) if from_date else "unknown_start"
         to_date_str = format_date(to_date) if to_date else "unknown_end"
         test_set_str = test_set if test_set else "unknown_test"
 
-        new_filename = f"{test_set_str}_{from_date_str}_{to_date_str}.csv"
+        new_filename = f"{test_set_str}_Date_From|{from_date_str}_Date_To|{to_date_str}.csv"
         
         return df, new_filename
 
     except Exception as e:
         return None, str(e)
 
-# Streamlit App
+# Streamlit Web App
 st.title("CSV File Renamer")
 st.write("Upload your CSV file, and the app will rename it based on test set and date.")
 
