@@ -15,7 +15,7 @@ def extract_info_from_csv(file):
     date_to_raw = str(df.iloc[1, 0])
     date_to = date_to_raw.split('|')[-1] if '|' in date_to_raw else date_to_raw
     
-    # Get test code from row 10 (this will be used as-is in the filename)
+    # Get test code from row 10 (e.g., V001, V435, V125)
     test_code = str(df.iloc[9, 0])
     
     # Convert dates to desired format (DDMMMYYYY)
@@ -75,7 +75,7 @@ def main():
             st.write("Please check your CSV file format. It should have:")
             st.write("- Date From in first row (format: DD/MM/YYYY or 'Date From|DD/MM/YYYY')")
             st.write("- Date To in second row (format: DD/MM/YYYY or 'Date To|DD/MM/YYYY')")
-            st.write("- Test code in row 10")
+            st.write("- Test code (e.g., V001, V435, V125) in row 10")
 
 if __name__ == "__main__":
     main()
