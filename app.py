@@ -1,134 +1,81 @@
-import os
-import pandas as pd
-import re
 import streamlit as st
+import pandas as pd
+import os
 from datetime import datetime
 
-# Function to extract test set
-def extract_test_set(row_value):
-    if pd.isna(row_value):
-        return None
+def extract_info_from_csv(file):
+    # Read the first few rows of the CSV
+    df = pd.read_csv(file, nrows=10)
     
-    value = str(row_value).lower()
+    # Get date_from from first row and split if it contains a prefix
+    date_from_raw = str(df.iloc[0, 0])
+    date_from = date_from_raw.split('|')[-1] if '|' in date_from_raw else date_from_raw
     
-    test_set_mapping = {
-        "hep a igm": "hep_a_igm",
-        "hepatitis a igm": "hep_a_igm",
-        "hep a igg": "hep_a_igg",
-        "hepatitis a igg": "hep_a_igg",
-        "hiv viral load": "hiv_vl",
-        "hiv vl": "hiv_vl",
-        "hiv pcr": "hiv_pcr",
-        "cmv igm": "cmv_igm",
-        "cmv igg": "cmv_igg",
-        "rubella igm": "rubella_igm",
-        "rubella igg": "rubella_igg",
-        "hep b pcr": "hep_b_pcr",
-        "hep b igg": "hep_b_igg",
-        "hep c pcr": "hep_c_pcr",
-        "hep c viral load": "hep_c_vl",
-        "hbsag": "hbsag",
-        "ebv igg": "ebv_igg",
-        "ebv igm": "ebv_igm",
-        "hsv igm": "hsv_igm",
-        "hsv igg": "hsv_igg",
-    }
-
-    for test_pattern, standardized_name in test_set_mapping.items():
-        if test_pattern in value:
-            return standardized_name
-
-    cleaned = re.sub(r'[^a-z0-9]', '_', value)
-    cleaned = re.sub(r'_+', '_', cleaned).strip('_')
+    # Get date_to from second row and split if it contains a prefix
+    date_to_raw = str(df.iloc[1, 0])
+    date_to = date_to_raw.split('|')[-1] if '|' in date_to_raw else date_to_raw
     
-    return cleaned if cleaned else "unknown_test"
-
-# Function to format date
-def format_date(date_str):
-    if pd.isna(date_str):
-        return "unknown_date"
+    # Get test code from row 10 (this will be used as-is in the filename)
+    test_code = str(df.iloc[9, 0])
     
-    date_str = str(date_str).strip()
-    date_formats = [
-        '%d/%m/%Y', '%d/%m/%y', '%m/%d/%Y', '%m/%d/%y',
-        '%Y-%m-%d', '%d-%m-%Y', '%d-%m-%y', '%d %b %Y', '%d %B %Y'
-    ]
-
-    for fmt in date_formats:
-        try:
-            date_obj = datetime.strptime(date_str, fmt)
-            return date_obj.strftime('%d%b%Y').upper()
-        except ValueError:
-            continue
-    
-    return date_str.replace('/', '_').replace('-', '_').replace(' ', '_')
-
-# Function to rename CSV file
-def rename_csv_file(uploaded_file):
+    # Convert dates to desired format (DDMMMYYYY)
     try:
-        # Reset file pointer
-        uploaded_file.seek(0)
-        
-        # Read the CSV file into DataFrame
-        df = pd.read_csv(uploaded_file, nrows=15, header=None, encoding='utf-8', encoding_errors='ignore')
-
-        from_date = None
-        to_date = None
-        test_set = None
-
-        # Scan first 5 rows for 'Date From' and 'Date To'
-        for row in range(min(5, len(df))):
-            for col in range(min(10, len(df.columns))):
-                cell_value = df.iloc[row, col]
-                if isinstance(cell_value, str):
-                    if "date from" in cell_value.lower():
-                        from_date = df.iloc[row, col + 1] if col + 1 < len(df.columns) else None
-                    if "date to" in cell_value.lower():
-                        to_date = df.iloc[row, col + 1] if col + 1 < len(df.columns) else None
-
-        # Extract test set from first 10 rows
-        for row in range(min(10, len(df))):
-            for col in range(min(5, len(df.columns))):
-                cell_value = df.iloc[row, col]
-                if pd.notna(cell_value):
-                    cell_str = str(cell_value).lower()
-                    if any(term in cell_str for term in ["igm", "igg", "pcr", "viral load", "antibody"]):
-                        test_set = extract_test_set(cell_str)
-                        break
-            if test_set:
-                break
-
-        # Format the extracted values
-        from_date_str = format_date(from_date) if from_date else "unknown_start"
-        to_date_str = format_date(to_date) if to_date else "unknown_end"
-        test_set_str = test_set if test_set else "unknown_test"
-
-        new_filename = f"{test_set_str}_Date_From|{from_date_str}_Date_To|{to_date_str}.csv"
-        
-        return df, new_filename
-
-    except Exception as e:
-        return None, str(e)
-
-# Streamlit Web App
-st.title("CSV File Renamer")
-st.write("Upload your CSV file, and the app will rename it based on test set and date.")
-
-uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
-
-if uploaded_file:
-    df, new_filename = rename_csv_file(uploaded_file)
+        date_from_formatted = datetime.strptime(date_from, '%d/%m/%Y').strftime('%d%b%Y').upper()
+        date_to_formatted = datetime.strptime(date_to, '%d/%m/%Y').strftime('%d%b%Y').upper()
+    except ValueError:
+        try:
+            # Try alternative format if needed
+            date_from_formatted = datetime.strptime(date_from, '%Y-%m-%d').strftime('%d%b%Y').upper()
+            date_to_formatted = datetime.strptime(date_to, '%Y-%m-%d').strftime('%d%b%Y').upper()
+        except ValueError as e:
+            raise ValueError(f"Unable to parse dates. Found: '{date_from}' and '{date_to}'") from e
     
-    if df is not None:
-        st.success(f"File renamed to: **{new_filename}**")
-        
-        # Provide download link
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="Download renamed CSV",
-            data=csv,
-            file_name=new_filename,
-            mime="text/csv"
-        )
-    else:
-        st.error(f"Error: {new_filename}")
+    return test_code, date_from_formatted, date_to_formatted
+
+def rename_csv_file(uploaded_file):
+    # Get original file name and extension
+    original_name = uploaded_file.name
+    file_extension = os.path.splitext(original_name)[1]
+    
+    # Extract information
+    test_code, date_from, date_to = extract_info_from_csv(uploaded_file)
+    
+    # Create new filename using just the code from row 10
+    new_filename = f"{test_code}_{date_from}_{date_to}{file_extension}"
+    
+    return new_filename, uploaded_file.getvalue()
+
+# Streamlit app
+def main():
+    st.title("CSV File Renamer")
+    st.write("Upload a CSV file to rename it based on test code and dates")
+    
+    # File uploader
+    uploaded_file = st.file_uploader("Choose a CSV file", type=['csv'])
+    
+    if uploaded_file is not None:
+        # Process the file
+        try:
+            new_filename, file_content = rename_csv_file(uploaded_file)
+            
+            # Display original and new filename
+            st.write(f"Original filename: {uploaded_file.name}")
+            st.write(f"New filename: {new_filename}")
+            
+            # Download button
+            st.download_button(
+                label="Download renamed file",
+                data=file_content,
+                file_name=new_filename,
+                mime="text/csv"
+            )
+            
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
+            st.write("Please check your CSV file format. It should have:")
+            st.write("- Date From in first row (format: DD/MM/YYYY or 'Date From|DD/MM/YYYY')")
+            st.write("- Date To in second row (format: DD/MM/YYYY or 'Date To|DD/MM/YYYY')")
+            st.write("- Test code in row 10")
+
+if __name__ == "__main__":
+    main()
