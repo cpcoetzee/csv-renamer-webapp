@@ -15,8 +15,9 @@ def extract_info_from_csv(file):
     date_to_raw = str(df.iloc[1, 0])
     date_to = date_to_raw.split('|')[-1] if '|' in date_to_raw else date_to_raw
     
-    # Get test code from row 10 (e.g., V001, V435, V125)
-    test_code = str(df.iloc[9, 0])
+    # Get test code from row 10 and remove "Testset|" prefix if present
+    test_code_raw = str(df.iloc[9, 0])
+    test_code = test_code_raw.replace("Testset|", "") if "Testset|" in test_code_raw else test_code_raw
     
     # Convert dates to desired format (DDMMMYYYY)
     try:
@@ -40,7 +41,7 @@ def rename_csv_file(uploaded_file):
     # Extract information
     test_code, date_from, date_to = extract_info_from_csv(uploaded_file)
     
-    # Create new filename using just the code from row 10
+    # Create new filename using cleaned test code
     new_filename = f"{test_code}_{date_from}_{date_to}{file_extension}"
     
     return new_filename, uploaded_file.getvalue()
@@ -75,7 +76,7 @@ def main():
             st.write("Please check your CSV file format. It should have:")
             st.write("- Date From in first row (format: DD/MM/YYYY or 'Date From|DD/MM/YYYY')")
             st.write("- Date To in second row (format: DD/MM/YYYY or 'Date To|DD/MM/YYYY')")
-            st.write("- Test code (e.g., V001, V435, V125) in row 10")
+            st.write("- Test code (e.g., 'Testset|V105' or 'V105') in row 10")
 
 if __name__ == "__main__":
     main()
